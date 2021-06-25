@@ -3,6 +3,7 @@ import Class_flask
 from Class_flask import Problem
 from flask import Flask, jsonify
 import db
+import json
 
 
 app = Flask(__name__)
@@ -45,13 +46,13 @@ def register():
     name = data["Name"]
     
     db_class = db.Database()
-    sql = f"INSERT INTO test_db.user VALUES ('{id}', '{pw}', '{name}')"
+    sql = f"INSERT INTO test_db.user VALUES ('{id}', '{pw}', '{name}', '{{}}')"
     try:
         db_class.execute(sql)
         db_class.commit()
     except:
-        return jsonify(result="False")
-    return jsonify(result="True")
+        return jsonify(Result="False")
+    return jsonify(Result="True")
 
 
 # 로그인
@@ -62,13 +63,103 @@ def login():
     pw = data["Pwd"]
     
     db_class = db.Database()
-    sql = f"SELECT id FROM test_db.user WHERE id='{id}' AND pw='{pw}'"
+    sql = f"SELECT name FROM test_db.user WHERE id='{id}' AND pw='{pw}'"
     row = db_class.executeAll(sql)
 
     if len(row)>0:
-        return jsonify(result="True")
+        name = row[0]['name']
+        print(row[0])
+        return jsonify(Result="True", Name=name)
     else:
-        return jsonify(result="False")
+        return jsonify(Result="False")
+
+
+# 유저 정보 요청
+@app.route("/get_user_info", methods=["POST"])
+def get_user_info():
+    data = request.get_json()
+    id = data["ID"]
+    
+    db_class = db.Database()
+    sql = f"SELECT solvedlist FROM test_db.user WHERE id='{id}'"
+    #sql = f"UPDATE test_db.user SET solvedlist='{{\"1001]\":\"AC\"}}' WHERE id='admin'"
+    row = db_class.executeAll(sql)
+    solvedlist_dict = json.loads(row[0]['solvedlist'])
+
+    solvedlist = []
+
+    for key in solvedlist_dict.keys():
+        if solvedlist_dict[key] == "AC":
+            solvedlist.append(key)
+
+    if len(row)>0:
+        #row[0]["solvedlist"]
+        return jsonify(ID=id, solvedlist=solvedlist)
+    else:
+        return jsonify(ID=id, solvedlist="False")
+
+
+# 문제 리스트 요청/응답
+@app.route("/get_problem_list", methods=["GET"])
+def get_problem_list():
+    db_class = db.Database()
+    sql = f"SELECT pnum, title FROM test_db.problem"
+    rows = db_class.executeAll(sql)
+    problem_list = []
+    
+    for row in rows:
+        tmp_dict = dict()
+        tmp_dict['pnum'] = int(row['pnum'])
+        tmp_dict['title'] = row['title']
+        problem_list.append(tmp_dict)
+    '''
+    solvedlist = []
+    for key in solvedlist_dict.keys():
+        if solvedlist_dict[key] == "AC":
+            solvedlist.append(key)
+
+    if len(row)>0:
+        #row[0]["solvedlist"]
+        return jsonify(ID=id, solvedlist=solvedlist)
+    else:
+        return jsonify(ID=id, solvedlist="False")
+    '''
+    return jsonify(Problems=problem_list)
+
+
+    '''
+    description_dict = json.loads(row[0]['description'])
+    timelimit = float(row[0]['timelimit'])
+    memorylimit = float(row[0]['memorylimit'])
+    trycount = int(row[0]['trycount'])
+    solvedcount = int(row[0]['solvedcount'])
+    '''
+
+@app.route("/problem_info", methods=["GET"])
+def problem_info():
+    data = request.get_json()
+    pnum = int(data["Pnum"])
+
+    db_class = db.Database()
+    sql = f"SELECT * FROM test_db.problem WHERE pnum={pnum}"
+    row = db_class.executeAll(sql)
+    
+    if len(row)>0:
+        title = row['title']
+        description_dict = json.loads(row[0]['description'])
+        description = description_dict['description']
+        input_description = description_dict['input_description']
+        output_description = description_dict['output_description']
+        sample_data = description_dict['sample_data']
+        timelimit = float(row[0]['timelimit'])
+        memorylimit = float(row[0]['memorylimit'])
+        trycount = int(row[0]['trycount'])
+        solvedcount = int(row[0]['solvedcount'])
+
+        return jsonify(Result=True, Pnum=pnum, Pname=title, Solved="Null", Pcond=[timelimit, memorylimit], Pdetail=[description, input_description, output_description], Pinout=sample_data, Pacrate=[trycount, solvedcount])
+
+    else:
+        return jsonify(Result=False)
 
 
 if __name__ == "__main__":
